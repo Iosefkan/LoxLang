@@ -41,16 +41,22 @@ class Lox
             [
                 "Block : List<Stmt?> Statements",
                 "Expression : Expr Expr",
+                "Function : Token Name, List<Token> Params, List<Stmt?> Body",
+                "If : Expr Condition, Stmt ThenBranch, Stmt? ElseBranch",
                 "Print : Expr Expr",
-                "Var : Token Name, Expr? Initializer"
+                "Return : Token Keyword, Expr? Value",
+                "Var : Token Name, Expr? Initializer",
+                "While : Expr Condition, Stmt Body",
             ]);
             
             DefineAst(outputDir, "Expr",
             [
                 "Assign : Token Name, Expr Value",
                 "Binary : Expr Left, Token Operator, Expr Right",
+                "Call : Expr Callee, Token Paren, List<Expr> Arguments",
                 "Grouping : Expr Expression",
                 "Literal : object? Value",
+                "Logical : Expr Left, Token Oper, Expr Right",
                 "Unary : Token Operator, Expr Right",
                 "Variable : Token Name"
             ]);
@@ -137,10 +143,10 @@ class Lox
     {
         if (token.Type == TokenType.EOF)
         {
-            Report(token.Line, " at end", message);
+            Report(token.Line, "at end", message);
             return;
         }
-        Report(token.Line, $" at '{token.Lexeme}'", message);
+        Report(token.Line, $"at '{token.Lexeme}'", message);
     }
 
     public static void RuntimeError(RuntimeException exception)

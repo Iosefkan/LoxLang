@@ -2,8 +2,17 @@ namespace sLox;
 
 public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
 {
-    private Environ _environment = new();
-    
+    private static readonly Environ Globals = new();
+    private Environ _environment = Globals;
+
+    public Interpreter()
+    {
+        Globals.Define("clock", new LoxCallable(
+            () => 0, 
+            (inter,  args) => (double)DateTimeOffset.Now.ToUnixTimeMilliseconds() / 1000.0,
+            () => "<native fn>"
+            ));
+    }
     public void Interpret(List<Stmt> statements)
     {
         try
@@ -17,6 +26,20 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         {
             Lox.RuntimeError(ex);
         }
+    }
+
+    public object? VisitIfStmt(Stmt.If stmt)
+    {
+        if (IsTruthy(Evaluate(stmt.Condition)))
+        {
+            Execute(stmt.ThenBranch);
+        }
+        else if (stmt.ElseBranch is not null)
+        {
+            Execute(stmt.ElseBranch);
+        }
+
+        return null;
     }
 
     public object? VisitBlockStmt(Stmt.Block stmt)
@@ -55,6 +78,70 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         
         _environment.Define(stmt.Name.Lexeme, value);
         return null;
+    }
+
+    public object? VisitWhileStmt(Stmt.While stmt)
+    {
+        while (IsTruthy(Evaluate(stmt.Condition)))
+        {
+            Execute(stmt.Body);
+        }
+
+        return null;
+    }
+
+    public object? VisitFunctionStmt(Stmt.Function stmt)
+    {
+        LoxFunction function = new(stmt, _environment);
+        _environment.Define(stmt.Name.Lexeme, function);
+        return null;
+    }
+
+    public object? VisitReturnStmt(Stmt.Return stmt)
+    {
+        object? value = null;
+        if (stmt.Value is not null) value = Evaluate(stmt.Value);
+        throw new Return(value);
+    }
+
+    public object? VisitCallExpr(Expr.Call expr)
+    {
+        object? callee = Evaluate(expr.Callee);
+
+        List<object?> arguments = new();
+        foreach (Expr argument in expr.Arguments)
+        {
+            arguments.Add(Evaluate(argument));
+        }
+        
+        if (callee is not LoxCallable function)
+        {
+            throw new RuntimeException(expr.Paren, "Can only call functions and classes.");
+        }
+
+        if (arguments.Count != function.Arity())
+        {
+            throw new RuntimeException(expr.Paren,
+                $"Expected {function.Arity()} arguments but got {arguments.Count}.");
+        }
+        
+        return function.Call(this, arguments);
+    }
+
+    public object? VisitLogicalExpr(Expr.Logical expr)
+    {
+        object? left = Evaluate(expr.Left);
+
+        if (expr.Oper.Type is TokenType.OR)
+        {
+            if (IsTruthy(left)) return left;
+        }
+        else
+        {
+            if (!IsTruthy(left)) return left;
+        }
+        
+        return Evaluate(expr.Right);
     }
 
     public object? VisitVariableExpr(Expr.Variable expr)
@@ -175,7 +262,7 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         stmt.Accept(this);
     }
 
-    private void ExecuteBlock(List<Stmt?> statements, Environ env)
+    public void ExecuteBlock(List<Stmt?> statements, Environ env)
     {
         Environ previous = this._environment;
         try

@@ -6,8 +6,10 @@ public abstract record Expr
 	{
 		T VisitAssignExpr(Assign expr);
 		T VisitBinaryExpr(Binary expr);
+		T VisitCallExpr(Call expr);
 		T VisitGroupingExpr(Grouping expr);
 		T VisitLiteralExpr(Literal expr);
+		T VisitLogicalExpr(Logical expr);
 		T VisitUnaryExpr(Unary expr);
 		T VisitVariableExpr(Variable expr);
 	}
@@ -25,6 +27,13 @@ public abstract record Expr
 			return visitor.VisitBinaryExpr(this);
 		}
 	}
+	public record Call(Expr Callee, Token Paren, List<Expr> Arguments) : Expr
+	{
+		public override T Accept<T>(IVisitor<T>  visitor)
+		{
+			return visitor.VisitCallExpr(this);
+		}
+	}
 	public record Grouping(Expr Expression) : Expr
 	{
 		public override T Accept<T>(IVisitor<T>  visitor)
@@ -37,6 +46,13 @@ public abstract record Expr
 		public override T Accept<T>(IVisitor<T>  visitor)
 		{
 			return visitor.VisitLiteralExpr(this);
+		}
+	}
+	public record Logical(Expr Left, Token Oper, Expr Right) : Expr
+	{
+		public override T Accept<T>(IVisitor<T>  visitor)
+		{
+			return visitor.VisitLogicalExpr(this);
 		}
 	}
 	public record Unary(Token Operator, Expr Right) : Expr

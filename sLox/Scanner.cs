@@ -163,7 +163,7 @@ public class Scanner
         }
 
         Advance();
-        string value = _source.Substring(_start + 1, _current - _start - 1);
+        string value = _source.Substring(_start + 1, _current - _start - 2);
         AddToken(TokenType.STRING, value);
     }
 
