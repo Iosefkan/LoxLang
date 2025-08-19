@@ -1,6 +1,4 @@
-﻿using System.Text;
-
-namespace sLox;
+﻿namespace sLox;
 
 class Lox
 {
@@ -130,6 +128,11 @@ class Lox
         List<Stmt> statements = parser.Parse();
         
         if (HadError) return;
+
+        Resolver resolver = new(Interpreter);
+        resolver.Resolve(statements!);
+        
+        if (HadError) return;
         
         Interpreter.Interpret(statements);
     }
@@ -141,7 +144,7 @@ class Lox
 
     public static void Error(Token token, string message)
     {
-        if (token.Type == TokenType.EOF)
+        if (token.Type == TokenType.Eof)
         {
             Report(token.Line, "at end", message);
             return;

@@ -4,6 +4,7 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
 {
     private static readonly Environ Globals = new();
     private Environ _environment = Globals;
+    private readonly Dictionary<Expr, int> _locals = new();
 
     public Interpreter()
     {
@@ -51,7 +52,16 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
     public object? VisitAssignExpr(Expr.Assign expr)
     {
         object? value = Evaluate(expr.Value);
-        _environment.Assign(expr.Name, value);
+
+        if (_locals.TryGetValue(expr, out var distance))
+        {
+            _environment.AssignAt(distance, expr.Name, value);
+        }
+        else
+        {
+            Globals.Assign(expr.Name, value);
+        }
+
         return value;
     }
     
@@ -132,7 +142,7 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
     {
         object? left = Evaluate(expr.Left);
 
-        if (expr.Oper.Type is TokenType.OR)
+        if (expr.Oper.Type is TokenType.Or)
         {
             if (IsTruthy(left)) return left;
         }
@@ -146,7 +156,16 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
 
     public object? VisitVariableExpr(Expr.Variable expr)
     {
-        return _environment.Get(expr.Name);
+        return LookUpVariable(expr.Name, expr);
+    }
+
+    private object? LookUpVariable(Token name, Expr expr)
+    {
+        if (_locals.TryGetValue(expr, out var distance))
+        {
+            return _environment.GetAt(distance, name.Lexeme);
+        }
+        return Globals.Get(name);
     }
     
     public object? VisitLiteralExpr(Expr.Literal expr)
@@ -165,9 +184,9 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
 
         switch (expr.Operator.Type)
         {
-            case TokenType.BANG:
+            case TokenType.Bang:
                 return !IsTruthy(right);
-            case TokenType.MINUS:
+            case TokenType.Minus:
                 CheckNumberOperand(expr.Operator, right);
                 return -(double)right!;
         }
@@ -182,30 +201,30 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
 
         switch (expr.Operator.Type)
         {
-            case TokenType.BANG_EQUAL: return !IsEqual(left, right);
-            case TokenType.EQUAL_EQUAL: return IsEqual(left, right);
-            case TokenType.GREATER:
+            case TokenType.BangEqual: return !IsEqual(left, right);
+            case TokenType.EqualEqual: return IsEqual(left, right);
+            case TokenType.Greater:
                 CheckNumberOperands(expr.Operator, left, right);
                 return (double)left! > (double)right!;
-            case TokenType.GREATER_EQUAL:
+            case TokenType.GreaterEqual:
                 CheckNumberOperands(expr.Operator, left, right);
                 return (double)left! >= (double)right!;
-            case TokenType.LESS:
+            case TokenType.Less:
                 CheckNumberOperands(expr.Operator, left, right);
                 return (double)left! < (double)right!;
-            case TokenType.LESS_EQUAL:
+            case TokenType.LessEqual:
                 CheckNumberOperands(expr.Operator, left, right);
                 return (double)left! <= (double)right!;
-            case TokenType.MINUS:
+            case TokenType.Minus:
                 CheckNumberOperands(expr.Operator, left, right);
                 return (double)left! - (double)right!;
-            case TokenType.SLASH:
+            case TokenType.Slash:
                 CheckNumberOperands(expr.Operator, left, right);
                 return (double)left! / (double)right!;
-            case TokenType.STAR:
+            case TokenType.Star:
                 CheckNumberOperands(expr.Operator, left, right);
                 return (double)left! * (double)right!;
-            case TokenType.PLUS:
+            case TokenType.Plus:
                 if (left is double dl && right is double dr)
                 {
                     return dl + dr;
@@ -260,6 +279,11 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
     private void Execute(Stmt stmt)
     {
         stmt.Accept(this);
+    }
+
+    public void Resolve(Expr expr, int depth)
+    {
+        _locals.Add(expr, depth);
     }
 
     public void ExecuteBlock(List<Stmt?> statements, Environ env)
