@@ -1,5 +1,7 @@
 .idea/
+.vscode/
 bin/
 obj/
 *.lox
 *.DotSettings.user
+build/
