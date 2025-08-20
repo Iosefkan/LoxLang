@@ -49,6 +49,71 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         return null;
     }
 
+    public object? VisitSuperExpr(Expr.Super expr)
+    {
+        int distance = _locals[expr];
+        LoxClass? superclass = _environment.GetAt(distance, "super") as LoxClass;
+        LoxInstance? obj = _environment.GetAt(distance - 1, "this") as LoxInstance;
+
+        LoxFunction? method = superclass?.FindMethod(expr.Method.Lexeme);
+
+        if (method is null)
+        {
+            throw new RuntimeException(expr.Method, $"Undefined property '{expr.Method.Lexeme}'.");
+        }
+        
+        return method.Bind(obj!);
+    }
+
+    public object? VisitClassStmt(Stmt.Class stmt)
+    {
+        object? superclass = null;
+        if (stmt.Superclass is not null)
+        {
+            superclass = Evaluate(stmt.Superclass);
+            if (superclass is not LoxClass)
+            {
+                throw new RuntimeException(stmt.Superclass.Name, "Superclass must be a class.");
+            }
+        }
+        
+        _environment.Define(stmt.Name.Lexeme, null);
+
+        if (stmt.Superclass is not null)
+        {
+            _environment = new Environ(_environment);
+            _environment.Define("super", superclass);
+        }
+        
+        Dictionary<string, LoxFunction> methods = new();
+        foreach (var method in stmt.Methods)
+        {
+            LoxFunction function = new(method, _environment, method.Name.Lexeme.Equals("init"));
+            methods[method.Name.Lexeme] = function;
+        }
+        
+        LoxClass klass = new(stmt.Name.Lexeme, superclass as LoxClass, methods);
+
+        if (superclass is not null)
+        {
+            _environment = _environment.Enclosing!;
+        }
+        
+        _environment.Assign(stmt.Name, klass);
+        return null;
+    }
+
+    public object? VisitGetExpr(Expr.Get expr)
+    {
+        object? obj = Evaluate(expr.Obj);
+        if (obj is LoxInstance instance)
+        {
+            return instance.Get(expr.Name);
+        }
+
+        throw new RuntimeException(expr.Name, "Only instances have properties.");
+    }
+
     public object? VisitAssignExpr(Expr.Assign expr)
     {
         object? value = Evaluate(expr.Value);
@@ -63,6 +128,11 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         }
 
         return value;
+    }
+
+    public object? VisitThisExpr(Expr.This expr)
+    {
+        return LookUpVariable(expr.Keyword, expr);
     }
     
     public object? VisitExpressionStmt(Stmt.Expression stmt)
@@ -102,7 +172,7 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
 
     public object? VisitFunctionStmt(Stmt.Function stmt)
     {
-        LoxFunction function = new(stmt, _environment);
+        LoxFunction function = new(stmt, _environment, false);
         _environment.Define(stmt.Name.Lexeme, function);
         return null;
     }
@@ -112,6 +182,18 @@ public class Interpreter : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         object? value = null;
         if (stmt.Value is not null) value = Evaluate(stmt.Value);
         throw new Return(value);
+    }
+
+    public object? VisitSetExpr(Expr.Set expr)
+    {
+        object? obj = Evaluate(expr.Obj);
+        if (obj is not LoxInstance instance)
+        {
+            throw new RuntimeException(expr.Name, "Only instances have fields.");
+        }
+        object? value = Evaluate(expr.Value);
+        instance.Set(expr.Name, value);
+        return value;
     }
 
     public object? VisitCallExpr(Expr.Call expr)

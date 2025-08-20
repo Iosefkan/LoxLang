@@ -5,10 +5,53 @@ public class Resolver : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
     private readonly Interpreter _interpreter;
     private readonly Stack<Dictionary<string, bool>> _scopes = new();
     private FunctionType _currentFunction = FunctionType.None;
+    private ClassType _currentClass = ClassType.None;
 
     public Resolver(Interpreter interpreter)
     {
         _interpreter = interpreter;
+    }
+
+    public object? VisitClassStmt(Stmt.Class stmt)
+    {
+        ClassType enclosingClass = _currentClass;
+        _currentClass = ClassType.Class;
+        
+        Declare(stmt.Name);
+        Define(stmt.Name);
+
+        if (stmt.Superclass is not null && stmt.Name.Lexeme.Equals(stmt.Superclass.Name.Lexeme))
+        {
+            Lox.Error(stmt.Superclass.Name, "A class can't inherit from itself.");
+        }
+        
+        if (stmt.Superclass is not null)
+        {
+            _currentClass = ClassType.Subclass;
+            Resolve(stmt.Superclass);
+            
+            BeginScope();
+            _scopes.Peek()["super"] = true;
+        }
+        
+        BeginScope();
+        _scopes.Peek()["this"] = true;
+
+        foreach (var method in stmt.Methods)
+        {
+            var declaration = FunctionType.Method;
+            if (method.Name.Lexeme.Equals("init"))
+            {
+                declaration = FunctionType.Initializer;
+            }
+            ResolveFunction(method, declaration);
+        }
+        
+        EndScope();
+        if (stmt.Superclass is not null) EndScope();
+        _currentClass = enclosingClass;
+        
+        return null;
     }
 
     public object? VisitBlockStmt(Stmt.Block stmt)
@@ -104,6 +147,10 @@ public class Resolver : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         
         if (stmt.Value is not null)
         {
+            if (_currentFunction is FunctionType.Initializer)
+            {
+                Lox.Error(stmt.Keyword, "Can't return a value from an initializer.");
+            }
             Resolve(stmt.Value);
         }
         return null;
@@ -113,6 +160,46 @@ public class Resolver : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
     {
         Resolve(stmt.Condition);
         Resolve(stmt.Body);
+        return null;
+    }
+
+    public object? VisitSuperExpr(Expr.Super expr)
+    {
+        if (_currentClass is ClassType.None)
+        {
+            Lox.Error(expr.Keyword, "Can't use 'super' outside of a class.");
+        }
+        else if (_currentClass is not ClassType.Subclass)
+        {
+            Lox.Error(expr.Keyword, "Can't use 'super' in a class with no superclass.");
+        }
+        
+        ResolveLocal(expr, expr.Keyword);
+        return null;
+    }
+
+    public object? VisitThisExpr(Expr.This expr)
+    {
+        if (_currentClass is ClassType.None)
+        {
+            Lox.Error(expr.Keyword, "Can't use 'this' outside of a class.");
+            return null;
+        }
+        
+        ResolveLocal(expr, expr.Keyword);
+        return null;
+    }
+
+    public object? VisitSetExpr(Expr.Set expr)
+    {
+        Resolve(expr.Value);
+        Resolve(expr.Obj);
+        return null;
+    }
+
+    public object? VisitGetExpr(Expr.Get expr)
+    {
+        Resolve(expr.Obj);
         return null;
     }
 
@@ -179,7 +266,7 @@ public class Resolver : Expr.IVisitor<object?>, Stmt.IVisitor<object?>
         {
             if (_scopes.ElementAt(i).ContainsKey(name.Lexeme))
             {
-                _interpreter.Resolve(expr, _scopes.Count - 1 - i);
+                _interpreter.Resolve(expr, i);
                 return;
             }
         }

@@ -29,6 +29,7 @@ public class Parser
     {
         try
         {
+            if (Match(TokenType.Class)) return ClassDeclaration();
             if (Match(TokenType.Fun)) return Function("function");
             if (Match(TokenType.Var)) return VarDeclaration();
 
@@ -39,6 +40,28 @@ public class Parser
             Synchronize();
             return null;
         }
+    }
+
+    private Stmt ClassDeclaration()
+    {
+        Token name = Consume(TokenType.Identifier, "Expect class name.");
+
+        Expr.Variable? superclass = null;
+        if (Match(TokenType.Less))
+        {
+            Consume(TokenType.Identifier, "Expect class superclass name.");
+            superclass = new Expr.Variable(Previous);
+        }
+        
+        Consume(TokenType.LeftBrace, "Expect '{' before class body.");
+        List<Stmt.Function> methods = new();
+        while (!Check(TokenType.RightBrace) && !IsAtEnd)
+        {
+            methods.Add(Function("method"));
+        }
+        Consume(TokenType.RightBrace, "Expect '}' after class body.");
+        
+        return new Stmt.Class(name, superclass, methods);
     }
 
     private Stmt.Function Function(string kind)
@@ -204,6 +227,11 @@ public class Parser
                 return new Expr.Assign(name, value);
             }
 
+            if (expr is Expr.Get get)
+            {
+                return new Expr.Set(get.Obj, get.Name, value);
+            }
+
             Error(equals, "Invalid assignment target.");
         }
 
@@ -316,6 +344,11 @@ public class Parser
             {
                 expr = FinishCall(expr);
             }
+            else if (Match(TokenType.Dot))
+            {
+                Token name = Consume(TokenType.Identifier, "Expect property name after '.'.");
+                expr = new Expr.Get(expr, name);
+            }
             else break;
         }
 
@@ -352,6 +385,16 @@ public class Parser
         {
             return new Expr.Literal(Previous.Literal);
         }
+
+        if (Match(TokenType.Super))
+        {
+            Token keyword = Previous;
+            Consume(TokenType.Dot, "Expect '.' after 'super'.");
+            Token method = Consume(TokenType.Identifier, "Expect superclass method name.");
+            return new Expr.Super(keyword, method);
+        }
+
+        if (Match(TokenType.This)) return new Expr.This(Previous);
 
         if (Match(TokenType.Identifier))
         {

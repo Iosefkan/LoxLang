@@ -3,5 +3,7 @@ namespace sLox;
 public enum FunctionType
 {
     None,
-    Function
+    Function,
+    Method,
+    Initializer,
 }

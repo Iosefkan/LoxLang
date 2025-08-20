@@ -134,7 +134,7 @@ public class Scanner
         AddToken(tokenType, null);
     }
 
-    private void AddToken(TokenType tokenType, object literal)
+    private void AddToken(TokenType tokenType, object? literal)
     {
         string text = _source.Substring(_start, _current - _start);
         _tokens.Add(new Token(tokenType, text, literal, _line));
