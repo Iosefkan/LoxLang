@@ -3,7 +3,6 @@
 
 #define STACK_MAX 256
 
-
 #include "chunk.h"
 #include "value.h"
 

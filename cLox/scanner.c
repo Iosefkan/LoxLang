@@ -57,7 +57,7 @@ static char peek(){
 }
 
 static char peekNext(){
-    if (!isAtEnd()) return '\0';
+    if (isAtEnd()) return '\0';
     return scanner.current[1];
 }
 
@@ -109,7 +109,10 @@ static bool isDigit(char c) {
 }
 
 static Token number(){
-    while (isDigit(peek())) advance();
+    while (isDigit(peek())) {
+        advance();
+    }
+
     if (peek() == '.' && isDigit(peekNext())) {
         advance();
         while (isDigit(peek())) advance();
@@ -122,12 +125,6 @@ static bool isAlpha(char c) {
     return (c >= 'a' && c <= 'z') ||
         (c >= 'A' && c <= 'Z') ||
         c == '_';
-}
-
-static Token identifier(){
-    while (isAlpha(peek()) || isDigit(peek())) advance();
-
-    return makeToken(identifierType());
 }
 
 static TokenType checkKeyword(int start, int length, const char* rest, TokenType type){
@@ -170,6 +167,12 @@ static TokenType identifierType(){
         case 'w': return checkKeyword(1, 4, "hile", TOKEN_WHILE);
     }
     return TOKEN_IDENTIFIER;
+}
+
+static Token identifier(){
+    while (isAlpha(peek()) || isDigit(peek())) advance();
+
+    return makeToken(identifierType());
 }
 
 Token scanToken(){

@@ -235,7 +235,7 @@ static void expression(){
     parsePrecedence(PREC_ASSIGNMENT);
 }
 
-bool compiler(const char* source, Chunk* chunk){
+bool compile(const char* source, Chunk* chunk){
     initScanner(source);
     compilingChunk = chunk;
 
