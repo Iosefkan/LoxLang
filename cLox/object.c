@@ -62,7 +62,7 @@ void printObject(Value value){
 ObjString* takeString(char* chars, int length){
     uint32_t hash = hashString(chars, length);
 
-    ObjString* interned = tablFindString(&vm.strings, chars, length, hash);
+    ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
     if (interned != NULL){
         FREE_ARRAY(char, chars, length + 1);
         return interned;
