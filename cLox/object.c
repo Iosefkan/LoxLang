@@ -84,6 +84,15 @@ void printObject(Value value){
         case OBJ_UPVALUE:
             printf("upvalue");
             break;
+        case OBJ_CLASS:
+            printf("%s", AS_CLASS(value)->name->chars);
+            break;
+        case OBJ_INSTANCE:
+            printf("%s instance", AS_INSTANCE(value)->class->name->chars);
+            break;
+        case OBJ_BOUND_METHOD:
+            printFunction(AS_BOUND_METHOD(value)->method->function);
+            break;
     }
 }
 
@@ -126,6 +135,27 @@ ObjClosure* newClosure(ObjFunction* function){
     closure->upvalues = upvalues;
     closure->upvalueCount = function->upvalueCount;
     return closure;
+}
+
+ObjClass* newClass(ObjString* name){
+    ObjClass* class = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    class->name = name;
+    initTable(&class->methods);
+    return class;
+}
+
+ObjInstance* newInstance(ObjClass* class){
+    ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+    instance->class = class;
+    initTable(&instance->fields);
+    return instance;
+}
+
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method){
+    ObjBoundMethod* bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+    bound->receiver = receiver;
+    bound->method = method;
+    return bound;
 }
 
 ObjUpvalue* newUpvalue(Value* slot){
